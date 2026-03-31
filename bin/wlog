@@ -8,6 +8,26 @@
 ############################################################
 
 ACTION="view"
+IS_MAC=false
+[[ "$OSTYPE" == "darwin"* ]] && IS_MAC=true
+
+function _date_parse {
+  # Parse a date string to YYYY-MM-DD
+  if $IS_MAC; then date -jf "%Y-%m-%d" "$1" +%Y-%m-%d
+  else date -d "$1" +%Y-%m-%d; fi
+}
+function _date_epoch {
+  if $IS_MAC; then date -jf "%Y-%m-%d" "$1" +%s
+  else date -d "$1" +%s; fi
+}
+function _date_next {
+  if $IS_MAC; then date -j -v+1d -f "%Y-%m-%d" "$1" +%Y-%m-%d
+  else date -d "$1 + 1 day" +%Y-%m-%d; fi
+}
+function _date_fmt {
+  if $IS_MAC; then date -jf "%Y-%m-%d" "$1" "$2"
+  else date --date="$1" "$2"; fi
+}
 ## Options
 ##----------------------------------------------------------
 while [[ $# -gt 0 ]] ; do
@@ -31,7 +51,7 @@ while [[ $# -gt 0 ]] ; do
 ##     -dS | --date-start
 ##        Add new todo item
     -dS | --date-start)
-      date_start=`date -d "$2" +%Y-%m-%d`
+      date_start=`_date_parse "$2"`
       ;;
 ##     -a | --add
 ##        Add new todo item
@@ -86,9 +106,9 @@ done
 ##
 ## WLOG_HOME
 ##   Directory for all the wlogs.
-##   defaults to $HOME/wlog
+##   defaults to $HOME/.wlog
 if [ -z $WLOG_HOME ]; then
-  WLOG_HOME="$HOME/wlog"
+  WLOG_HOME="$HOME/.wlog"
 fi
 
 function ensure_today {
@@ -110,7 +130,7 @@ function ensure_today {
       fi
 
       [[ "$confirm" =~ ^(Y|y)$ ]] && $EDITOR $yesterday
-      cat $yesterday | grep -P '^- \[' | grep -v '\[x\]' >> $today_todo
+      cat $yesterday | grep -E '^\- \[' | grep -v '\[x\]' >> $today_todo
     fi
   fi
 }
@@ -120,14 +140,14 @@ function today_dir {
 }
 
 function yesterday {
-  yesterday=`find $WLOG_HOME -maxdepth 1 -type d -exec realpath {} \; | egrep -v '(\.git|assets)' | sort | tail -n 2 | head -n 1`
+  yesterday=`find $WLOG_HOME -maxdepth 1 -mindepth 1 -type d | grep -Ev '(\.git|assets)' | sort | tail -n 2 | head -n 1`
   if [ "$yesterday" != "$today_dir" ]; then
     echo $yesterday/00-todo.md
   fi
 }
 
 function report_file {
-  echo "#" `date --date="$(basename $(dirname $1))" +'%A %B %d, %Y'`
+  echo "#" `_date_fmt "$(basename $(dirname $1))" +'%A %B %d, %Y'`
   cat $1
   echo
   echo ------------------
@@ -176,7 +196,7 @@ function report {
 
   if [ ! -z $date_start ]; then
     while true; do
-      date_s=$(date -d "$date_start" +%s)
+      date_s=$(_date_epoch "$date_start")
       if [ $today_s -le $date_s ]; then
         break
       fi
@@ -184,7 +204,7 @@ function report {
       if [ -d "$WLOG_HOME/$date_start" ]; then
         [ -f  "$WLOG_HOME/$date_start/"00-todo.md ] && report_file "$WLOG_HOME/$date_start/"00-todo.md
       fi
-      date_start=`date -d "$date_start + 1 day" +%Y-%m-%d`
+      date_start=`_date_next "$date_start"`
     done
   else
     yesterday=`yesterday`
@@ -199,7 +219,7 @@ function summary {
 
   if [ ! -z $date_start ]; then
     while true; do
-      date_s=$(date -d "$date_start" +%s)
+      date_s=$(_date_epoch "$date_start")
       if [ $today_s -le $date_s ]; then
         break
       fi
@@ -211,7 +231,7 @@ function summary {
         echo ----------
 
       fi
-      date_start=`date -d "$date_start + 1 day" +%Y-%m-%d`
+      date_start=`_date_next "$date_start"`
     done
   else
     echo "# $date_start"
