@@ -82,6 +82,20 @@ while [[ $# -gt 0 ]] ; do
     -S | --summary)
       ACTION='summary'
       ;;
+##     -D | --done
+##        Mark a todo item as done by number
+    -D | --done)
+      ACTION='done_item'
+      item_num="$2"
+      shift
+      ;;
+##     -u | --undone
+##        Mark a todo item as undone by number
+    -u | --undone)
+      ACTION='undone_item'
+      item_num="$2"
+      shift
+      ;;
 ##     -U | --upgrade
 ##        Upgrade wlog files. backup recommended
     -U | --upgrade)
@@ -111,6 +125,10 @@ if [ -z $WLOG_HOME ]; then
   WLOG_HOME="$HOME/.wlog"
 fi
 
+if [ -z $EDITOR ]; then
+  EDITOR=vim
+fi
+
 function ensure_today {
   today_dir=`today_dir`
   today_todo="$today_dir/00-todo.md"
@@ -130,13 +148,13 @@ function ensure_today {
       fi
 
       [[ "$confirm" =~ ^(Y|y)$ ]] && $EDITOR $yesterday
-      cat $yesterday | grep -E '^\- \[' | grep -v '\[x\]' >> $today_todo
+      cat $yesterday | grep -E '^\- \[' | grep -v '\[X\]' >> $today_todo
     fi
   fi
 }
 
 function today_dir {
-  echo "$WLOG_HOME/`date +%Y-%m-%d`/"
+  echo "$WLOG_HOME/`date +%Y-%m-%d`"
 }
 
 function yesterday {
@@ -172,7 +190,11 @@ function ensure_setup {
 }
 
 function view {
-  report_file $today_todo
+  echo "#" `_date_fmt "$(basename $(dirname $today_todo))" +'%A %B %d, %Y'`
+  awk '/^\- \[/ { n++; printf "%2d. %s\n", n, $0; next } { print }' $today_todo
+  echo
+  echo ------------------
+  echo
 }
 
 function edit {
@@ -185,6 +207,35 @@ function edit_script {
 
 function add {
   echo "- [ ]$task_to_add" >> $today_todo
+  view
+}
+
+function _mark_item {
+  local pattern="$1"
+  local replacement="$2"
+  if [ -z "$item_num" ]; then
+    echo "Usage: wlog --done/--undone <number>"
+    exit 1
+  fi
+  line_num=$(awk '/^\- \[/ { n++ } n=='"$item_num"' { print NR; exit }' $today_todo)
+  if [ -z "$line_num" ]; then
+    echo "Item $item_num not found"
+    exit 1
+  fi
+  if $IS_MAC; then
+    sed -i '' "${line_num}s/${pattern}/${replacement}/" $today_todo
+  else
+    sed -i "${line_num}s/${pattern}/${replacement}/" $today_todo
+  fi
+  view
+}
+
+function done_item {
+  _mark_item '- \[ \]' '- [X]'
+}
+
+function undone_item {
+  _mark_item '- \[X\]' '- [ ]'
 }
 
 function snippet {
