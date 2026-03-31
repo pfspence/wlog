@@ -25,6 +25,10 @@
 ##        generate a report for the last 2 days
 ##     -S | --summary
 ##        detailed summary
+##     -D | --done <number>
+##        Mark a todo item as done by number
+##     -u | --undone <number>
+##        Mark a todo item as undone by number
 ##     -U | --upgrade
 ##        Upgrade wlog files. backup recommended
 ##
